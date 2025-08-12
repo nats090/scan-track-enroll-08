@@ -28,6 +28,9 @@ interface RegistrationForm {
   department: string;
   level: string;
   shift: string;
+  course: string;
+  year: string;
+  contactNumber: string;
 }
 
 const StudentRegistration: React.FC<StudentRegistrationProps> = ({ 
@@ -38,16 +41,19 @@ const StudentRegistration: React.FC<StudentRegistrationProps> = ({
   const [profilePicture, setProfilePicture] = useState<string | null>(null);
   const [rfidData, setRfidData] = useState<string>('');
   
-  const form = useForm<RegistrationForm>({
-    defaultValues: {
-      name: '',
-      studentId: '',
-      email: '',
-      department: 'none',
-      level: 'none',
-      shift: 'none'
-    }
-  });
+const form = useForm<RegistrationForm>({
+  defaultValues: {
+    name: '',
+    studentId: '',
+    email: '',
+    department: 'none',
+    level: 'none',
+    shift: 'none',
+    course: '',
+    year: '',
+    contactNumber: ''
+  }
+});
 
   const watchedLevel = form.watch('level');
 
@@ -103,13 +109,16 @@ const StudentRegistration: React.FC<StudentRegistrationProps> = ({
   const onSubmit = async (data: RegistrationForm) => {
     console.log('Form submission data:', data);
     
-    const studentData: Omit<Student, 'id'> = {
+const studentData: Omit<Student, 'id'> = {
       name: data.name,
       studentId: data.studentId,
       email: data.email,
       department: data.department === 'none' ? undefined : data.department,
       level: data.level === 'none' ? undefined : data.level as 'elementary' | 'junior-high' | 'senior-high' | 'college',
       shift: (data.level === 'senior-high' && data.shift !== 'none') ? data.shift as 'morning' | 'afternoon' : undefined,
+      course: data.course,
+      year: data.year,
+      contactNumber: data.contactNumber,
       profilePicture: profilePicture || undefined,
       rfid: rfidData || undefined
     };
@@ -299,6 +308,48 @@ const StudentRegistration: React.FC<StudentRegistrationProps> = ({
                     )}
                   />
                 )}
+
+<FormField
+                  control={form.control}
+                  name="course"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Course</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Enter course" {...field} required />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="year"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Year</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Enter year (e.g., 1st Year or Grade 11)" {...field} required />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="contactNumber"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Contact Number</FormLabel>
+                      <FormControl>
+                        <Input type="tel" placeholder="Enter contact number" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
                 <FormField
                   control={form.control}
