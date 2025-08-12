@@ -108,8 +108,41 @@ const form = useForm<RegistrationForm>({
 
   const onSubmit = async (data: RegistrationForm) => {
     console.log('Form submission data:', data);
-    
-const studentData: Omit<Student, 'id'> = {
+
+    // Validation rules
+    const nameValid = !!data.name && data.name.trim().split(/\s+/).length >= 2;
+    const emailValid = !data.email || /^[A-Za-z0-9._%+-]+@(gmail\.com|ndkc\.edu\.ph)$/.test(data.email);
+    const studentIdValid = /^\d{4}-\d{3,4}$/.test(data.studentId || '');
+    const courseValid = !!data.course?.trim();
+    const yearValid = !!data.year?.trim();
+
+    if (!nameValid) {
+      form.setError('name', { type: 'manual', message: 'Please enter first and last name.' });
+      toast({ title: 'Invalid Name', description: 'Enter at least first and last name.', variant: 'destructive' });
+      return;
+    }
+    if (!studentIdValid) {
+      form.setError('studentId', { type: 'manual', message: 'Format: YYYY-XXX or YYYY-XXXX (e.g., 2021-033).' });
+      toast({ title: 'Invalid Student ID', description: 'Use format YYYY-XXX or YYYY-XXXX.', variant: 'destructive' });
+      return;
+    }
+    if (!emailValid) {
+      form.setError('email', { type: 'manual', message: 'Email must be gmail.com or ndkc.edu.ph.' });
+      toast({ title: 'Invalid Email Domain', description: 'Use gmail.com or ndkc.edu.ph.', variant: 'destructive' });
+      return;
+    }
+    if (!courseValid) {
+      form.setError('course', { type: 'manual', message: 'Course is required.' });
+      toast({ title: 'Course Required', description: 'Please enter course.', variant: 'destructive' });
+      return;
+    }
+    if (!yearValid) {
+      form.setError('year', { type: 'manual', message: 'Year is required.' });
+      toast({ title: 'Year Required', description: 'Please enter year.', variant: 'destructive' });
+      return;
+    }
+
+    const studentData: Omit<Student, 'id'> = {
       name: data.name,
       studentId: data.studentId,
       email: data.email,
@@ -188,7 +221,7 @@ const studentData: Omit<Student, 'id'> = {
                     <FormItem>
                       <FormLabel>Full Name</FormLabel>
                       <FormControl>
-                        <Input placeholder="Enter full name" {...field} required />
+                        <Input placeholder="Enter full name" {...field} required pattern="^[^\\s]+\\s+[^\\s]+.*$" title="Enter at least first and last name" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -202,7 +235,7 @@ const studentData: Omit<Student, 'id'> = {
                     <FormItem>
                       <FormLabel>Student ID</FormLabel>
                       <FormControl>
-                        <Input placeholder="Enter student ID" {...field} required />
+                        <Input placeholder="Enter student ID (e.g., 2021-033)" {...field} required pattern="^\\d{4}-\\d{3,4}$" title="Format: YYYY-XXX or YYYY-XXXX (e.g., 2021-033)" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -358,7 +391,7 @@ const studentData: Omit<Student, 'id'> = {
                     <FormItem className="md:col-span-2">
                       <FormLabel>Email</FormLabel>
                       <FormControl>
-                        <Input type="email" placeholder="Enter email" {...field} />
+                        <Input type="email" placeholder="Enter email (gmail.com or ndkc.edu.ph)" {...field} pattern="^[A-Za-z0-9._%+-]+@(gmail\\.com|ndkc\\.edu\\.ph)$" title="Use gmail.com or ndkc.edu.ph email" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
