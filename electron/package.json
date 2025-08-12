@@ -1,0 +1,8 @@
+{
+  "name": "library-attendance-system",
+  "version": "1.0.0",
+  "description": "Library Attendance System - Desktop Application",
+  "main": "main.js",
+  "author": "Library System Developer",
+  "license": "MIT"
+}

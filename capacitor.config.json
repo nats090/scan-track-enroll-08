@@ -1,0 +1,15 @@
+{
+  "appId": "app.lovable.4d495f70606c4bc981ee750e0efeac17",
+  "appName": "scan-track-enroll-11",
+  "webDir": "dist",
+  "server": {
+    "url": "https://4d495f70-606c-4bc9-81ee-750e0efeac17.lovableproject.com?forceHideBadge=true",
+    "cleartext": true
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 2000,
+      "launchAutoHide": true
+    }
+  }
+}
