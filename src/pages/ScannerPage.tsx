@@ -7,12 +7,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import BarcodeScanner from '@/components/BarcodeScanner';
 import StudentRegistration from '@/components/StudentRegistration';
 import VisitorEntry from '@/components/VisitorEntry';
-import { Barcode, UserPlus, User } from 'lucide-react';
+import { Barcode, UserPlus, User, ContactRound } from 'lucide-react';
 import { Student } from '@/types/Student';
+import RFIDScanner from '@/components/RFIDScanner';
 
 interface ScannerPageProps {
   onBarcodeDetected: (barcode: string) => void;
   onBiometricDetected: (biometricData: string) => void;
+  onRFIDDetected: (rfidData: string) => void;
   onStudentRegistered: (student: Student) => void;
   onVisitorEntry: (visitorData: { name: string; purpose: string; contact: string }) => void;
 }
@@ -20,10 +22,11 @@ interface ScannerPageProps {
 const ScannerPage = ({ 
   onBarcodeDetected, 
   onBiometricDetected, 
+  onRFIDDetected,
   onStudentRegistered, 
   onVisitorEntry 
 }: ScannerPageProps) => {
-  const [activeScanner, setActiveScanner] = useState<'none' | 'barcode'>('none');
+  const [activeScanner, setActiveScanner] = useState<'none' | 'barcode' | 'rfid'>('none');
   const [showRegistration, setShowRegistration] = useState(false);
   const [showVisitorEntry, setShowVisitorEntry] = useState(false);
 
@@ -42,9 +45,10 @@ const ScannerPage = ({
         </CardHeader>
         <CardContent className="space-y-6">
           <Tabs defaultValue="barcode" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="barcode">Barcode Scanner</TabsTrigger>
-              <TabsTrigger value="manual">Manual Entry</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="barcode">Barcode</TabsTrigger>
+              <TabsTrigger value="rfid">RFID</TabsTrigger>
+              <TabsTrigger value="manual">Manual</TabsTrigger>
             </TabsList>
             
             <TabsContent value="barcode" className="space-y-4">
@@ -63,6 +67,29 @@ const ScannerPage = ({
                     <BarcodeScanner
                       onBarcodeDetected={onBarcodeDetected}
                       isActive={activeScanner === 'barcode'}
+                    />
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+
+            <TabsContent value="rfid" className="space-y-4">
+              <div className="text-center space-y-4">
+                <Button
+                  onClick={() => setActiveScanner(activeScanner === 'rfid' ? 'none' : 'rfid')}
+                  size="lg"
+                  className="bg-primary hover:bg-primary/90"
+                >
+                  <ContactRound className="h-5 w-5 mr-2" />
+                  {activeScanner === 'rfid' ? 'Stop RFID Scanning' : 'Start RFID Scanning'}
+                </Button>
+                
+                {activeScanner === 'rfid' && (
+                  <div className="flex justify-center">
+                    <RFIDScanner
+                      onRFIDDetected={onRFIDDetected}
+                      isActive={activeScanner === 'rfid'}
+                      mode="register"
                     />
                   </div>
                 )}

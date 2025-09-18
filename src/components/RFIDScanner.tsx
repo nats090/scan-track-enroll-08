@@ -6,6 +6,9 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { ContactRound, Wifi, WifiOff, Check, X, Zap, Shield, AlertCircle } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { attendanceService } from '@/services/attendanceService';
+import { studentService } from '@/services/studentService';
+import { getFromLocalStorage } from '@/utils/offlineStorage';
 
 // Web Serial API type definitions
 interface SerialOptions {
@@ -43,15 +46,23 @@ declare global {
 }
 
 interface RFIDScannerProps {
-  onRFIDDetected: (rfidData: string) => void;
+  onRFIDDetected?: (rfidData: string) => void;
   isActive: boolean;
   currentRFID?: string;
+  mode?: 'check-in' | 'check-out' | 'register' | 'general';
+  onCheckIn?: (studentData: any) => void;
+  onCheckOut?: (studentData: any) => void;
+  onRegister?: (rfidData: string) => void;
 }
 
 const RFIDScanner: React.FC<RFIDScannerProps> = ({ 
   onRFIDDetected, 
   isActive, 
-  currentRFID 
+  currentRFID,
+  mode = 'general',
+  onCheckIn,
+  onCheckOut,
+  onRegister
 }) => {
   const [manualRFID, setManualRFID] = useState(currentRFID || '');
   const [isScanning, setIsScanning] = useState(false);
@@ -146,10 +157,10 @@ const RFIDScanner: React.FC<RFIDScannerProps> = ({
         const { value, done } = await reader.read();
         if (done) break;
         
-        if (value) {
-          const data = new TextDecoder().decode(value);
-          processRFIDData(data);
-        }
+    if (value) {
+      const data = new TextDecoder().decode(value);
+      await processRFIDData(data);
+    }
       }
     } catch (error) {
       console.error('Error reading from RFID device:', error);
@@ -157,7 +168,32 @@ const RFIDScanner: React.FC<RFIDScannerProps> = ({
     }
   };
 
-  const processRFIDData = (data: string) => {
+  const findStudent = async (searchId: string) => {
+    // First check local storage
+    const localData = await getFromLocalStorage();
+    const localStudent = localData.students.find(s =>
+      s.studentId === searchId || s.id === searchId || s.rfid === searchId
+    );
+    
+    if (localStudent) {
+      return localStudent;
+    }
+
+    // Try online lookup if available
+    try {
+      if (navigator.onLine) {
+        // Try finding by RFID
+        const student = await studentService.findStudentByRFID(searchId);
+        return student;
+      }
+    } catch (error) {
+      console.log('Online lookup failed, using local data only');
+    }
+    
+    return null;
+  };
+
+  const processRFIDData = async (data: string) => {
     // Process incoming RFID data (format varies by reader manufacturer)
     const cleanData = data.trim().replace(/[\r\n]/g, '');
     
@@ -166,13 +202,132 @@ const RFIDScanner: React.FC<RFIDScannerProps> = ({
       const rfidData = `RFID:${cleanData.toUpperCase()}:${timestamp}`;
       
       setManualRFID(rfidData);
-      onRFIDDetected(rfidData);
       setLastScanTime(new Date());
+
+      // Handle different modes
+      if (mode === 'check-in' && onCheckIn) {
+        await handleCheckIn(cleanData.toUpperCase());
+      } else if (mode === 'check-out' && onCheckOut) {
+        await handleCheckOut(cleanData.toUpperCase());
+      } else if (mode === 'register' && onRegister) {
+        onRegister(rfidData);
+        toast({
+          title: "RFID Card Read Successfully",
+          description: `Card UID: ${cleanData.toUpperCase()}`,
+          duration: 3000,
+        });
+      } else if (onRFIDDetected) {
+        onRFIDDetected(rfidData);
+        toast({
+          title: "RFID Card Read Successfully",
+          description: `Card UID: ${cleanData.toUpperCase()}`,
+          duration: 3000,
+        });
+      }
+    }
+  };
+
+  const handleCheckIn = async (rfidUID: string) => {
+    try {
+      const student = await findStudent(rfidUID);
       
+      if (student) {
+        // Check current status before allowing check-in
+        const currentStatus = await attendanceService.getStudentCurrentStatus(student.studentId);
+        
+        if (currentStatus === 'checked-in') {
+          toast({
+            title: "Already Checked In",
+            description: `${student.name} is already checked in. Please check out first.`,
+            variant: "destructive",
+          });
+          return;
+        }
+
+        const newRecord = {
+          studentId: student.studentId,
+          studentName: student.name,
+          timestamp: new Date(),
+          type: 'check-in' as const,
+          method: 'rfid' as const
+        };
+        
+        await attendanceService.addAttendanceRecord(newRecord);
+        
+        toast({
+          title: "Welcome!",
+          description: `${student.name} checked in successfully via RFID`,
+          duration: 3000,
+        });
+      } else {
+        toast({
+          title: "Student Not Found",
+          description: "RFID card not registered. Please register first or use manual entry.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
       toast({
-        title: "RFID Card Read Successfully",
-        description: `Card UID: ${cleanData.toUpperCase()}`,
-        duration: 3000,
+        title: "Error",
+        description: "Something went wrong during check-in. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleCheckOut = async (rfidUID: string) => {
+    try {
+      const student = await findStudent(rfidUID);
+      
+      if (student) {
+        // Check current status before allowing check-out
+        const currentStatus = await attendanceService.getStudentCurrentStatus(student.studentId);
+        
+        if (currentStatus === 'checked-out') {
+          toast({
+            title: "Already Checked Out",
+            description: `${student.name} is not currently checked in.`,
+            variant: "destructive",
+          });
+          return;
+        }
+        
+        if (currentStatus === 'unknown') {
+          toast({
+            title: "No Check-in Record",
+            description: `${student.name} has no active check-in record.`,
+            variant: "destructive",
+          });
+          return;
+        }
+
+        const newRecord = {
+          studentId: student.studentId,
+          studentName: student.name,
+          timestamp: new Date(),
+          type: 'check-out' as const,
+          method: 'rfid' as const
+        };
+        
+        await attendanceService.addAttendanceRecord(newRecord);
+        
+        toast({
+          title: "Goodbye!",
+          description: `${student.name} checked out successfully via RFID`,
+          duration: 3000,
+        });
+      } else {
+        toast({
+          title: "Student Not Found",
+          description: "RFID card not registered. Please register first or use manual entry.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Something went wrong during check-out. Please try again.",
+        variant: "destructive",
       });
     }
   };
@@ -213,7 +368,7 @@ const RFIDScanner: React.FC<RFIDScannerProps> = ({
     });
   }, [isActive, serialPort]);
 
-  const handleManualInput = () => {
+  const handleManualInput = async () => {
     if (manualRFID.trim()) {
       // Validate RFID format
       const rfidPattern = /^[A-Fa-f0-9]{8,16}$/;
@@ -221,12 +376,26 @@ const RFIDScanner: React.FC<RFIDScannerProps> = ({
       
       if (rfidPattern.test(cleanRFID)) {
         const formattedRFID = `RFID:${cleanRFID.toUpperCase()}:${Date.now()}`;
-        onRFIDDetected(formattedRFID);
         setLastScanTime(new Date());
-        toast({
-          title: "RFID Set Successfully",
-          description: `Card UID: ${cleanRFID.toUpperCase()}`,
-        });
+
+        // Handle different modes for manual input too
+        if (mode === 'check-in' && onCheckIn) {
+          await handleCheckIn(cleanRFID.toUpperCase());
+        } else if (mode === 'check-out' && onCheckOut) {
+          await handleCheckOut(cleanRFID.toUpperCase());
+        } else if (mode === 'register' && onRegister) {
+          onRegister(formattedRFID);
+          toast({
+            title: "RFID Set Successfully",
+            description: `Card UID: ${cleanRFID.toUpperCase()}`,
+          });
+        } else if (onRFIDDetected) {
+          onRFIDDetected(formattedRFID);
+          toast({
+            title: "RFID Set Successfully",
+            description: `Card UID: ${cleanRFID.toUpperCase()}`,
+          });
+        }
       } else {
         toast({
           title: "Invalid RFID Format",
@@ -239,7 +408,7 @@ const RFIDScanner: React.FC<RFIDScannerProps> = ({
 
   const clearRFID = () => {
     setManualRFID('');
-    onRFIDDetected('');
+    if (onRFIDDetected) onRFIDDetected('');
     setLastScanTime(null);
   };
 
@@ -268,7 +437,7 @@ const RFIDScanner: React.FC<RFIDScannerProps> = ({
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-lg">
           <ContactRound className="h-5 w-5" />
-          Professional RFID Scanner
+          RFID Scanner ({mode.charAt(0).toUpperCase() + mode.slice(1)} Mode)
           <Badge variant="outline" className={`ml-auto ${getStatusColor()}`}>
             {getStatusIcon()}
             {rfidReaderStatus.toUpperCase()}

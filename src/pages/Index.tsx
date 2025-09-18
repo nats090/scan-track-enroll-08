@@ -219,6 +219,67 @@ const Index = () => {
     }
   };
 
+  const handleRFIDDetected = async (rfidData: string) => {
+    console.log('RFID detected:', rfidData);
+    
+    // Extract the UID from the formatted RFID data
+    const rfidMatch = rfidData.match(/RFID:([A-F0-9]+):/);
+    const rfidUID = rfidMatch ? rfidMatch[1] : rfidData;
+    
+    try {
+      let student: Student | null = null;
+      
+      if (isOnline) {
+        student = await supabaseService.findStudentByRFID(rfidUID);
+      } else {
+        // Find student in local storage when offline
+        student = students.find(s => s.rfid === rfidUID) || null;
+      }
+      
+      const newRecord: Omit<AttendanceEntry, 'id'> = {
+        studentId: student?.studentId || 'Unknown',
+        studentName: student?.name || 'Unknown Student',
+        timestamp: new Date(),
+        type: 'check-in', // Main page defaults to check-in
+        method: 'rfid',
+        library: currentLibrary
+      };
+      
+      if (isOnline && student) {
+        try {
+          const savedRecord = await supabaseService.addAttendanceRecord(newRecord);
+          addAttendanceToState(savedRecord);
+          updateStudentLastScan(student.studentId);
+        } catch (error) {
+          // Fallback to local storage if Supabase fails
+          const localRecord = { ...newRecord, id: Date.now().toString() };
+          addAttendanceToState(localRecord);
+        }
+      } else {
+        // Add to local storage when offline
+        const localRecord = { ...newRecord, id: Date.now().toString() };
+        addAttendanceToState(localRecord);
+        if (student) updateStudentLastScan(student.studentId);
+      }
+      
+      toast({
+        title: student ? "Success" : "Warning",
+        description: student 
+          ? `RFID attendance recorded for ${student.name}` 
+          : "Unknown RFID card scanned",
+        variant: student ? "default" : "destructive",
+      });
+      
+    } catch (error) {
+      console.error('Error processing RFID:', error);
+      toast({
+        title: "Error",
+        description: "Failed to process RFID scan",
+        variant: "destructive",
+      });
+    }
+  };
+
   // Keep the handleBiometricDetected function for backward compatibility but make it a no-op
   const handleBiometricDetected = async (biometricData: string) => {
     console.log('Biometric scanning disabled');
@@ -299,6 +360,7 @@ const Index = () => {
           <ScannerPage
             onBarcodeDetected={handleBarcodeDetected}
             onBiometricDetected={handleBiometricDetected}
+            onRFIDDetected={handleRFIDDetected}
             onStudentRegistered={handleStudentRegistered}
             onVisitorEntry={handleVisitorEntry}
           />

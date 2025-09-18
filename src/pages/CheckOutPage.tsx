@@ -3,8 +3,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { LogOut, Scan, UserPlus } from 'lucide-react';
+import { LogOut, Scan, UserPlus, ContactRound } from 'lucide-react';
 import BarcodeScanner from '@/components/BarcodeScanner';
+import RFIDScanner from '@/components/RFIDScanner';
 
 import BackButton from '@/components/BackButton';
 import { toast } from '@/components/ui/use-toast';
@@ -14,7 +15,7 @@ import { AttendanceEntry } from '@/types/AttendanceEntry';
 import { getFromLocalStorage } from '@/utils/offlineStorage';
 
 const CheckOutPage = () => {
-  const [manualEntry, setManualEntry] = useState(false);
+  const [scannerMode, setScannerMode] = useState<'barcode' | 'rfid' | 'manual'>('barcode');
   const [studentId, setStudentId] = useState('');
   const [studentName, setStudentName] = useState('');
 
@@ -190,7 +191,9 @@ const CheckOutPage = () => {
             Library Check Out
           </CardTitle>
           <p className="text-xl mt-2">
-            {manualEntry ? 'Manual check-out entry' : 'Scan your student ID to leave the library'}
+            {scannerMode === 'manual' ? 'Manual check-out entry' : 
+             scannerMode === 'rfid' ? 'Use your RFID card to leave the library' :
+             'Scan your student ID to leave the library'}
           </p>
         </CardHeader>
         
@@ -201,32 +204,55 @@ const CheckOutPage = () => {
           
           
           <div className="text-center space-y-6">
-            <div className="flex gap-4 justify-center mb-6">
+            <div className="flex gap-2 justify-center mb-6 flex-wrap">
               <Button 
-                onClick={() => setManualEntry(false)}
-                variant={!manualEntry ? "default" : "outline"}
+                onClick={() => setScannerMode('barcode')}
+                variant={scannerMode === 'barcode' ? "default" : "outline"}
+                size="sm"
               >
                 <Scan className="h-4 w-4 mr-2" />
-                Scanner Mode
+                Barcode
               </Button>
               <Button 
-                onClick={() => setManualEntry(true)}
-                variant={manualEntry ? "default" : "outline"}
+                onClick={() => setScannerMode('rfid')}
+                variant={scannerMode === 'rfid' ? "default" : "outline"}
+                size="sm"
+              >
+                <ContactRound className="h-4 w-4 mr-2" />
+                RFID
+              </Button>
+              <Button 
+                onClick={() => setScannerMode('manual')}
+                variant={scannerMode === 'manual' ? "default" : "outline"}
+                size="sm"
               >
                 <UserPlus className="h-4 w-4 mr-2" />
-                Manual Entry
+                Manual
               </Button>
             </div>
 
-            {!manualEntry ? (
+            {scannerMode === 'barcode' ? (
               <>
                 <div className="bg-gray-50 rounded-lg p-6">
                   <Scan size={64} className="mx-auto mb-4 text-gray-600" />
-                  <h3 className="text-2xl font-semibold mb-2">Scan Your Student ID or RFID</h3>
-                  <p className="text-gray-600 text-lg">Hold your student ID barcode or tap your RFID card</p>
+                  <h3 className="text-2xl font-semibold mb-2">Scan Your Student ID Barcode</h3>
+                  <p className="text-gray-600 text-lg">Hold your student ID barcode to the camera</p>
                 </div>
                 
                 <BarcodeScanner onBarcodeDetected={handleBarcodeDetected} isActive={true} />
+              </>
+            ) : scannerMode === 'rfid' ? (
+              <>
+                <div className="bg-gray-50 rounded-lg p-6 mb-4">
+                  <ContactRound size={64} className="mx-auto mb-4 text-gray-600" />
+                  <h3 className="text-2xl font-semibold mb-2">Use Your RFID Card</h3>
+                  <p className="text-gray-600 text-lg">Connect your RFID reader and tap your card</p>
+                </div>
+                
+                <RFIDScanner 
+                  isActive={true} 
+                  mode="check-out"
+                />
               </>
             ) : (
               <div className="bg-gray-50 rounded-lg p-6 text-left max-w-md mx-auto">
